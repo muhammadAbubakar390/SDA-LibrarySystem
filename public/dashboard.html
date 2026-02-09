@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Library Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <header>
+        <div class="container">
+            <h1>📚 Library Dashboard</h1>
+            <nav>
+                <span id="userGreeting" style="margin-right: 15px;">Welcome!</span>
+                <button onclick="logout()">Logout</button>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <div id="alertBox" class="alert"></div>
+
+        <!-- Stats Section -->
+        <div class="stats-grid" id="statsSection">
+            <div class="stat-card">
+                <div class="number" id="statsBooks">0</div>
+                <div>Total Books</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="statsActive">0</div>
+                <div>Active Borrows</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="statsUsers">0</div>
+                <div>Total Users</div>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+
+            <!-- Book Catalog -->
+            <div class="card" style="grid-column: span 2;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3>📖 Book Catalog</h3>
+                    <input type="text" id="searchBooks" placeholder="Search books..." onkeyup="filterBooks()"
+                        style="padding:5px; width:200px;">
+                </div>
+                <div style="max-height: 400px; overflow-y: auto;">
+                    <table id="booksTable">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Type</th>
+                                <th>Owner</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody><!-- Populated by JS --></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- My Borrowed Books -->
+            <div class="card" id="myBooksCard">
+                <h3>📚 My Borrowed Books</h3>
+                <div id="myBooksList">
+                    <p>No books borrowed.</p>
+                </div>
+            </div>
+
+            <!-- My Favorites -->
+            <div class="card" id="myFavoritesCard">
+                <h3>❤️ My Favorites</h3>
+                <div id="myFavoritesList">
+                    <p>No favorites yet.</p>
+                </div>
+            </div>
+
+            <!-- Add Book (For Everyone) -->
+            <div class="card" id="addBookCard">
+                <h3>➕ Add New Book</h3>
+                <form id="addBookForm">
+                    <div class="form-group">
+                        <label>Title</label>
+                        <input type="text" id="newBookTitle" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Author</label>
+                        <input type="text" id="newBookAuthor" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Copies</label>
+                        <input type="number" id="newBookCopies" value="1" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Type</label>
+                        <select id="newBookType" style="width:100%; padding:8px;">
+                            <option value="Regular">Regular</option>
+                            <option value="Reference">Reference</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="newBookCategory" style="width:100%; padding:8px;">
+                            <option value="Programming">Programming</option>
+                            <option value="Science">Science</option>
+                            <option value="Fiction">Fiction</option>
+                            <option value="History">History</option>
+                            <option value="Games">Games</option>
+                            <option value="Technology">Technology</option>
+                            <option value="Advertisements">Advertisements</option>
+                            <option value="Local Plays">Local Plays</option>
+                            <option value="Music">Music</option>
+                            <option value="Computer Vision">Computer Vision</option>
+                            <option value="Hacking">Hacking</option>
+                            <option value="Others">Others</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Visibility</label>
+                        <select id="newBookVisibility" style="width:100%; padding:8px;">
+                            <option value="PUBLIC">Public (Everyone sees it)</option>
+                            <option value="PRIVATE">Private (Only I see it)</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-success">Add Book</button>
+                </form>
+            </div>
+
+            <!-- Admin Specific: Add User -->
+            <div class="card hidden" id="adminAddUserCard">
+                <h3>👤 Add New User</h3>
+                <form id="addUserForm">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="newUserName" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="newUserPass" required>
+                    </div>
+                    <div class="form-group">
+                        <label>User Type</label>
+                        <select id="newUserType" style="width:100%; padding:8px;">
+                            <option value="authorized">Authorized</option>
+                            <option value="unauthorized">Unauthorized</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-success">Register User</button>
+                </form>
+            </div>
+
+            <!-- Admin Specific: User Management List -->
+            <div class="card hidden" id="adminUsersCard" style="grid-column: span 2;">
+                <h3>👥 User Management</h3>
+                <div style="max-height: 400px; overflow-y: auto;">
+                    <table id="usersTable">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Type</th>
+                                <th>Borrowed Books</th>
+                                <th>Outstanding Fine</th>
+                            </tr>
+                        </thead>
+                        <tbody><!-- Populated by JS --></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        // Init dashboard specific logic
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+            loadDashboard();
+        });
+    </script>
+</body>
+
+</html>

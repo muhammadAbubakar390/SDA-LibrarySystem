@@ -419,27 +419,33 @@ public class LibraryManagementSystem {
     static Map<String, List<String>> categoryBooks = new HashMap<>();
     static User loggedInUser = null;
     static LibraryEventManager eventManager = LibraryEventManager.getInstance();
+    static MongoDBManager dbManager = MongoDBManager.getInstance();
 
     /* -------------------- MAIN METHOD -------------------- */
     public static void main(String[] args) {
         // Initialize event manager with observers
         initializeObservers();
         
-        // Initialize categories
-        categories.add("Programming");
-        categories.add("Science");
-        categories.add("Fiction");
-        categories.add("History");
+        System.out.println("📚 ===== LIBRARY MANAGEMENT SYSTEM (WITH MONGODB) =====");
+        System.out.println("🔄 Connecting to MongoDB...");
         
-        // Initialize books with Factory Pattern
-        initializeBooks();
+        // Load data from database
+        loadDataFromDatabase();
         
-        // Create users with Factory Pattern
-        users.put("admin", new User("admin", "admin123", "authorized"));
-        users.put("user1", new User("user1", "pass123", "authorized"));
-        users.put("guest", new User("guest", "guest123", "unauthorized"));
-
-        System.out.println("📚 ===== LIBRARY MANAGEMENT SYSTEM (WITH DESIGN PATTERNS) =====");
+        // If no data in database, initialize with defaults
+        if (users.isEmpty()) {
+            System.out.println("ℹ️  No data found in database. Initializing with defaults...");
+            initializeDefaultData();
+        }
+        
+        System.out.println("✅ System ready!");
+        
+        // Add shutdown hook to save data
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("\n💾 Saving data to database...");
+            saveDataToDatabase();
+            dbManager.close();
+        }));
         
         while (true) {
             System.out.println("\n📋 === MAIN MENU ===");
@@ -449,7 +455,8 @@ public class LibraryManagementSystem {
             System.out.println("4️⃣   View Books (Decorator Pattern)");
             System.out.println("5️⃣   Browse by Category");
             System.out.println("6️⃣   Display User Info (Factory Pattern)");
-            System.out.println("7️⃣   Exit");
+            System.out.println("7️⃣   Database Operations");
+            System.out.println("8️⃣   Exit");
             System.out.print("👉 Enter choice: ");
 
             int choice = getIntInput();
@@ -461,8 +468,12 @@ public class LibraryManagementSystem {
                 case 4 -> viewBooksWithDecorator();
                 case 5 -> browseByCategory();
                 case 6 -> displayUserInfo();
-                case 7 -> {
+                case 7 -> databaseMenu();
+                case 8 -> {
+                    System.out.println("💾 Saving all data to database...");
+                    saveDataToDatabase();
                     eventManager.notifyObservers("SYSTEM_SHUTDOWN", "Library system is shutting down");
+                    dbManager.close();
                     System.out.println("👋 Thank you for using the system!");
                     System.exit(0);
                 }
@@ -477,8 +488,87 @@ public class LibraryManagementSystem {
         eventManager.addObserver(new EmailNotificationObserver("admin@library.com"));
     }
     
-    private static void initializeBooks() {
-        // Using Factory Pattern to create different book types
+    /* -------------------- DATABASE OPERATIONS -------------------- */
+    
+    private static void loadDataFromDatabase() {
+        if (!dbManager.isConnected()) {
+            System.out.println("⚠️  Database not connected. Running in offline mode.");
+            return;
+        }
+        
+        // Load users
+        users = dbManager.loadAllUsers();
+        
+        // Load books
+        books = dbManager.loadAllBooks();
+        
+        // Load book types
+        Map<String, String> bookTypeStrings = dbManager.loadBookTypes();
+        for (Map.Entry<String, String> entry : bookTypeStrings.entrySet()) {
+            bookTypes.put(entry.getKey(), BookFactory.createBookType(entry.getValue()));
+        }
+        
+        // Load categories
+        categories = dbManager.loadCategories();
+        if (categories.isEmpty()) {
+            // Initialize default categories
+            categories.add("Programming");
+            categories.add("Science");
+            categories.add("Fiction");
+            categories.add("History");
+        }
+        
+        // Load category books
+        categoryBooks = dbManager.loadCategoryBooks();
+        
+        // Initialize empty lists for categories without books
+        for (String category : categories) {
+            categoryBooks.putIfAbsent(category, new ArrayList<>());
+        }
+    }
+    
+    private static void saveDataToDatabase() {
+        if (!dbManager.isConnected()) {
+            System.out.println("⚠️  Database not connected. Cannot save data.");
+            return;
+        }
+        
+        // Save all users
+        for (User user : users.values()) {
+            dbManager.saveUser(user);
+        }
+        
+        // Save all books
+        for (Map.Entry<String, Integer> entry : books.entrySet()) {
+            String title = entry.getKey();
+            int copies = entry.getValue();
+            String bookType = bookTypes.get(title) != null ? bookTypes.get(title).getType() : "Regular";
+            String category = getBookCategory(title);
+            if (category.isEmpty()) category = "Uncategorized";
+            
+            dbManager.saveBook(title, copies, bookType, category);
+        }
+        
+        // Save categories
+        dbManager.saveCategories(categories, categoryBooks);
+        
+        System.out.println("✅ Data saved to database successfully!");
+    }
+    
+    private static void initializeDefaultData() {
+        // Initialize categories
+        categories.clear();
+        categories.add("Programming");
+        categories.add("Science");
+        categories.add("Fiction");
+        categories.add("History");
+        
+        // Initialize category books map
+        for (String category : categories) {
+            categoryBooks.put(category, new ArrayList<>());
+        }
+        
+        // Initialize books with Factory Pattern
         BookType regular = BookFactory.createBookType("regular");
         BookType reference = BookFactory.createBookType("reference");
         
@@ -498,10 +588,66 @@ public class LibraryManagementSystem {
         bookTypes.put("Database Management", reference);
         
         // Categorize books
-        categoryBooks.put("Programming", Arrays.asList("Java Programming", "Python Basics", "Data Structures"));
-        categoryBooks.put("Science", Arrays.asList("Physics Fundamentals", "Chemistry Basics"));
-        categoryBooks.put("Fiction", new ArrayList<>());
-        categoryBooks.put("History", new ArrayList<>());
+        categoryBooks.get("Programming").add("Java Programming");
+        categoryBooks.get("Programming").add("Python Basics");
+        categoryBooks.get("Programming").add("Data Structures");
+        categoryBooks.get("Science").add("Operating Systems");
+        categoryBooks.get("Science").add("Database Management");
+        
+        // Create default users with Factory Pattern
+        users.put("admin", new User("admin", "admin123", "authorized"));
+        users.put("user1", new User("user1", "pass123", "authorized"));
+        users.put("guest", new User("guest", "guest123", "unauthorized"));
+        
+        // Save to database
+        saveDataToDatabase();
+    }
+    
+    private static void databaseMenu() {
+        System.out.println("\n💾 === DATABASE OPERATIONS ===");
+        System.out.println("1️⃣   Save All Data to Database");
+        System.out.println("2️⃣   Reload Data from Database");
+        System.out.println("3️⃣   View Database Statistics");
+        System.out.println("4️⃣   Clear All Database Data (Admin Only)");
+        System.out.println("5️⃣   Back to Main Menu");
+        System.out.print("👉 Enter choice: ");
+        
+        int choice = getIntInput();
+        
+        switch (choice) {
+            case 1 -> {
+                saveDataToDatabase();
+                System.out.println("✅ All data saved successfully!");
+            }
+            case 2 -> {
+                loadDataFromDatabase();
+                System.out.println("✅ Data reloaded from database!");
+            }
+            case 3 -> {
+                dbManager.printDatabaseStats();
+            }
+            case 4 -> {
+                if (loggedInUser != null && loggedInUser.username.equals("admin")) {
+                    System.out.print("⚠️  Are you sure? This will delete ALL data! (yes/no): ");
+                    String confirm = sc.nextLine();
+                    if (confirm.equalsIgnoreCase("yes")) {
+                        dbManager.clearAllData();
+                        users.clear();
+                        books.clear();
+                        bookTypes.clear();
+                        categoryBooks.clear();
+                        initializeDefaultData();
+                        System.out.println("✅ Database cleared and reinitialized!");
+                    }
+                } else {
+                    System.out.println("❌ Admin access required!");
+                }
+            }
+            case 5 -> {
+                return;
+            }
+            default -> System.out.println("❌ Invalid choice!");
+        }
     }
     
     private static void displayUserInfo() {
@@ -582,6 +728,9 @@ public class LibraryManagementSystem {
         User newUser = new User(username, password, userType);
         users.put(username, newUser);
         
+        // Save to database
+        dbManager.saveUser(newUser);
+        
         eventManager.notifyObservers("USER_REGISTERED", 
             "New " + userType + " user registered: " + username);
         System.out.println("✅ User added successfully with " + userType + " privileges!");
@@ -598,6 +747,10 @@ public class LibraryManagementSystem {
                 System.out.print("➕ Enter additional copies: ");
                 int copies = getIntInput();
                 books.put(title, books.get(title) + copies);
+                
+                // Update in database
+                dbManager.updateBookCopies(title, books.get(title));
+                
                 System.out.println("✅ Added " + copies + " more copies of \"" + title + "\"");
             }
             return;
@@ -631,9 +784,13 @@ public class LibraryManagementSystem {
             category = categories.get(catChoice - 1);
         }
         
-        books.put(title + " by " + author, copies);
-        bookTypes.put(title + " by " + author, bookType);
-        categoryBooks.get(category).add(title + " by " + author);
+        String fullTitle = title + " by " + author;
+        books.put(fullTitle, copies);
+        bookTypes.put(fullTitle, bookType);
+        categoryBooks.get(category).add(fullTitle);
+        
+        // Save to database
+        dbManager.saveBook(fullTitle, copies, bookType.getType(), category);
         
         eventManager.notifyObservers("NEW_BOOK_ADDED", 
             "New " + bookType.getType() + " book added: " + title);
@@ -751,6 +908,9 @@ public class LibraryManagementSystem {
         
         String userType = (typeChoice == 1) ? "authorized" : "unauthorized";
         users.put(username, new User(username, password, userType));
+        
+        // Save to database
+        dbManager.saveUser(users.get(username));
         
         eventManager.notifyObservers("USER_REGISTERED", 
             "New user registered: " + username + " (" + userType + ")");
@@ -996,6 +1156,11 @@ public class LibraryManagementSystem {
             eventManager.notifyObservers("BOOK_BORROWED", 
                 loggedInUser.username + " borrowed: " + bookName + " (Due: " + dueDate + ")");
             
+            // Save to database
+            dbManager.saveUser(loggedInUser);
+            dbManager.updateBookCopies(bookName, books.get(bookName));
+            dbManager.saveTransaction(loggedInUser.username, bookName, "BORROW", today.toString());
+            
             System.out.println("✅ Book borrowed successfully!");
             System.out.println("📅 Borrow Date: " + today);
             System.out.println("⏰ Due Date: " + dueDate + " (" + bookType.getBorrowDuration() + " days)");
@@ -1058,6 +1223,11 @@ public class LibraryManagementSystem {
             
             eventManager.notifyObservers("BOOK_RETURNED", 
                 loggedInUser.username + " returned: " + bookName);
+            
+            // Save to database
+            dbManager.saveUser(loggedInUser);
+            dbManager.updateBookCopies(bookName, books.get(bookName));
+            dbManager.saveTransaction(loggedInUser.username, bookName, "RETURN", returnDate.toString());
             
             System.out.println("✅ Book returned successfully!");
             System.out.println("📅 Return Date: " + returnDate);
